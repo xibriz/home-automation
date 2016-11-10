@@ -1,11 +1,11 @@
 /*** ImportTelldusLive module *******************************************
-
-Version: 1.0.0
------------------------------------------------------------------------------
-Author: Ruben Andreassen <rubean85@gmail.com>
-Description:
-    Imports devices from Telldus Live via Proxy Script
-******************************************************************************/
+ 
+ Version: 1.0.0
+ -----------------------------------------------------------------------------
+ Author: Ruben Andreassen <rubean85@gmail.com>
+ Description:
+ Imports devices from Telldus Live via Proxy Script
+ ******************************************************************************/
 
 function ImportTelldusLive(id, controller) {
     // Always call superconstructor first
@@ -24,17 +24,24 @@ ImportTelldusLive.prototype.init = function (config) {
 
     this.urlPrefix = this.config.url + "/index.php";
     this.dT = Math.max(this.config.dT, 500); // 500 ms minimal delay between requests
-    this.lastRequest = 0;
-    this.timer = null;
+    this.sT = Math.max(this.config.sT, 30000); // 30000 ms minimal delay between requests for sensors
+    this.lastRequestD = 0;
+    this.lastRequestS = 0;
+    this.timerD = null; //Device Timer
+    this.timerS = null; //Sensor Timer
 
-    this.requestUpdate();
+    this.requestDeviceUpdate();
+    this.requestSensorUpdate();
 };
 
 ImportTelldusLive.prototype.stop = function () {
     var self = this;
 
-    if (this.timer) {
-        clearTimeout(this.timer);
+    if (this.timerD) {
+        clearTimeout(this.timerD);
+    }
+    if (this.timerS) {
+        clearTimeout(this.timerS);
     }
 
     this.controller.devices.filter(function (xDev) {
@@ -53,45 +60,45 @@ ImportTelldusLive.prototype.stop = function () {
 // --- Module methods
 // ----------------------------------------------------------------------------
 
-ImportTelldusLive.prototype.requestUpdate = function () {
+ImportTelldusLive.prototype.requestDeviceUpdate = function () {
     var self = this;
 
-    this.lastRequest = Date.now();
+    this.lastRequestD = Date.now();
 
     try {
         http.request({
-            url: this.urlPrefix+"?URI={%22resource%22:%22devices%22,%22function%22:%22list%22}&params={%22supportedMethods%22:19,%22includeIgnored%22:1}",
+            url: this.urlPrefix + "?URI={%22resource%22:%22devices%22,%22function%22:%22list%22}&params={%22supportedMethods%22:19,%22includeIgnored%22:1}",
             method: "GET",
             async: true,
             success: function (response) {
-                self.parseResponse(response);
+                self.parseDeviceResponse(response);
             },
             error: function (response) {
                 console.log("Can not make request: " + response.statusText); // don't add it to notifications, since it will fill all the notifcations on error
             },
             complete: function () {
-                var dt = self.lastRequest + self.dT - Date.now();
+                var dt = self.lastRequestD + self.dT - Date.now();
                 if (dt < 0) {
                     dt = 1; // in 1 ms not to make recursion
                 }
 
-                if (self.timer) {
-                    clearTimeout(self.timer);
+                if (self.timerD) {
+                    clearTimeout(self.timerD);
                 }
 
-                self.timer = setTimeout(function () {
-                    self.requestUpdate();
+                self.timerD = setTimeout(function () {
+                    self.requestDeviceUpdate();
                 }, dt);
             }
         });
     } catch (e) {
-        self.timer = setTimeout(function () {
-            self.requestUpdate();
+        self.timerD = setTimeout(function () {
+            self.requestDeviceUpdate();
         }, self.dT);
     }
 };
 
-ImportTelldusLive.prototype.parseResponse = function (response) {
+ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
     var self = this;
 
     if (response.status === 200, response.contentType === "application/json") {
@@ -121,7 +128,7 @@ ImportTelldusLive.prototype.parseResponse = function (response) {
                 if (self.skipDevice(localId)) {
                     return;
                 }
-                
+
                 var deviceType = (item.methods === 19) ? "switchMultilevel" : "switchBinary";
                 var probeTitle = (item.methods === 19) ? "Multilevel" : "Binary";
                 var icon = (item.methods === 19) ? "multilevel" : "switch";
@@ -139,7 +146,7 @@ ImportTelldusLive.prototype.parseResponse = function (response) {
                     },
                     overlay: {},
                     handler: function (command, args) {
-                        self.handleCommand(this, command, args);
+                        self.handleDeviceCommand(this, command, args);
                     },
                     moduleId: this.id
                 });
@@ -175,11 +182,11 @@ ImportTelldusLive.prototype.parseResponse = function (response) {
     }
 };
 
-ImportTelldusLive.prototype.handleCommand = function (vDev, command, args) {
+ImportTelldusLive.prototype.handleDeviceCommand = function (vDev, command, args) {
     var self = this;
 
     var remoteId = vDev.id.slice(("TL_" + this.id + "_").length);
-    
+
     var level = command;
     var method = 0;
     var tlLevel = 0;
@@ -193,14 +200,14 @@ ImportTelldusLive.prototype.handleCommand = function (vDev, command, args) {
         case "exact":
             method = 16; //Dim
             level = args.level;
-            tlLevel = Math.round((level/99)*255);
+            tlLevel = Math.round((level / 99) * 255);
             break;
         default:
             return;
     }
 
     http.request({
-        url: this.urlPrefix+"?URI={%22resource%22:%22device%22,%22function%22:%22command%22}&params={%22id%22:" + remoteId + ",%22method%22:"+method+",%22value%22:" + tlLevel + "}",
+        url: this.urlPrefix + "?URI={%22resource%22:%22device%22,%22function%22:%22command%22}&params={%22id%22:" + remoteId + ",%22method%22:" + method + ",%22value%22:" + tlLevel + "}",
         method: "GET",
         async: true,
         success: function (response) {
@@ -231,4 +238,119 @@ ImportTelldusLive.prototype.skipDevice = function (id) {
 
     return skip;
 };
- 
+
+ImportTelldusLive.prototype.requestSensorUpdate = function () {
+    var self = this;
+
+    this.lastRequestS = Date.now();
+
+    try {
+        http.request({
+            url: this.urlPrefix + "?URI={%22resource%22:%22sensors%22,%22function%22:%22list%22}&params={%22includeValues%22:1,%22includeIgnored%22:1,%22includeScale%22:1}",
+            method: "GET",
+            async: true,
+            success: function (response) {
+                self.parseSensorResponse(response);
+            },
+            error: function (response) {
+                console.log("Can not make request: " + response.statusText); // don't add it to notifications, since it will fill all the notifcations on error
+            },
+            complete: function () {
+                var dt = self.lastRequestS + self.sT - Date.now();
+                if (dt < 0) {
+                    dt = 1; // in 1 ms not to make recursion
+                }
+
+                if (self.timerS) {
+                    clearTimeout(self.timerS);
+                }
+
+                self.timerS = setTimeout(function () {
+                    self.requestSensorUpdate();
+                }, dt);
+            }
+        });
+    } catch (e) {
+        self.timerS = setTimeout(function () {
+            self.requestSensorUpdate();
+        }, self.sT);
+    }
+};
+
+
+ImportTelldusLive.prototype.parseSensorResponse = function (response) {
+    var self = this;
+
+    if (response.status === 200, response.contentType === "application/json") {
+        var data = response.data;
+
+        data.sensor.forEach(function (item) {
+            var subId = 0;
+            item.data.forEach(function (sensorData) {
+                var localId = "TL_" + self.id + "_" + item.id + "" + subId,
+                        vDev = self.controller.devices.get(localId);
+
+                if (vDev) {
+                    vDev.set("metrics:level", sensorData.value);
+                    vDev.set("updateTime", sensorData.lastUpdated);
+                } else if (!self.skipDevice(localId)) {
+                    var icon = (sensorData.name === "temp") ? "temperature" : "humidity";
+                    var scaleTitle = (sensorData.name === "temp") ? "°C" : "%";
+
+                    self.controller.devices.create({
+                        deviceId: localId,
+                        defaults: {
+                            deviceType: "sensorMultilevel",
+                            metrics: {
+                                probeTitle: item.model,
+                                level: sensorData.value,
+                                title: "TL " + item.name + " " + sensorData.name,
+                                icon: icon,
+                                scaleTitle: scaleTitle
+                            }
+                        },
+                        overlay: {},
+                        handler: {},
+                        moduleId: this.id,
+                        probeType: icon,
+                        updateTime: item.lastUpdated
+                    });
+
+                    self.config.renderDevices.push({deviceId: localId, deviceType: "sensorMultilevel"});
+                    self.saveConfig();
+                }
+
+                subId++;
+            });
+        });
+
+        if (data.structureChanged) {
+            var removeList = this.controller.devices.filter(function (xDev) {
+                var found = false;
+
+                if (xDev.id.indexOf("TL_" + self.id + "_") === -1) {
+                    return false; // not to remove devices created by other modules
+                }
+
+                data.sensor.forEach(function (item) {
+                    var subId = 0;
+                    item.data.forEach(function (sensorData) {
+                        if (("TL_" + self.id + "_" + item.id + "" + subId) === xDev.id) {
+                            found |= true;
+                            return false; // break
+                        }
+                        subId++;
+                    });
+                    return !found;
+                });
+                return found;
+            }).map(function (yDev) {
+                return yDev.id;
+            });
+
+            removeList.forEach(function (item) {
+                self.controller.devices.remove(item);
+            });
+        }
+    }
+};

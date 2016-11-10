@@ -17,6 +17,7 @@
         "description": "__m_descr__",
         "url": "http://localhost/telldus",
         "dT": 1000,
+        "sT": 30000,
         "skipDevices": [],
         "renderDevices": []
     },
@@ -28,6 +29,10 @@
                 "required": true
             },
             "dT": {
+                "type": "number",
+                "required": true
+            },
+            "sT": {
                 "type": "number",
                 "required": true
             },
@@ -67,6 +72,9 @@
             },
             "dT": {
                 "label": "__l_dT__"
+            },
+            "sT": {
+                "label": "__l_sT__"
             },
             "skipDevices": {
                 "label": "__l_skipDevices__",
