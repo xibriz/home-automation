@@ -1,0 +1,103 @@
+{
+    "dependencies": [],
+    "singleton": false,
+    "category": "support_external_dev",
+    "author": "Ruben Andreassen",
+    "homepage": "https://github.com/xibriz",
+    "icon": "icon.png",
+    "moduleName": "ImportTelldusLive",
+    "version": "1.0.0",
+    "maturity": "beta",
+    "repository": {
+        "type": "git",
+        "source": "https://github.com/xibriz/home-automation"
+    },
+    "defaults": {
+        "title": "__m_title__",
+        "description": "__m_descr__",
+        "url": "http://localhost/telldus",
+        "dT": 1000,
+        "skipDevices": [],
+        "renderDevices": []
+    },
+    "schema": {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "required": true
+            },
+            "dT": {
+                "type": "number",
+                "required": true
+            },
+            "skipDevices": {
+                "type": "array",
+                "items": {
+                    "field": "enum",
+                    "datasource": "namespaces",
+                    "enum": "namespaces:devices_all:deviceId",
+                    "required": true
+                }
+            },
+            "renderDevices": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "deviceId": {
+                            "field": "enum",
+                            "datasource": "namespaces",
+                            "enum": "namespaces:devices_all:deviceId",
+                            "required": true
+                        },
+                        "deviceType": {
+                            "type": "string",
+                            "required": true
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "options": {
+        "fields": {
+            "url": {
+                "label": "__l_url__"
+            },
+            "dT": {
+                "label": "__l_dT__"
+            },
+            "skipDevices": {
+                "label": "__l_skipDevices__",
+                "fields": {
+                    "item": {
+                        "type": "select",
+                        "datasource": "namespaces",
+                        "field": "optionLabels",
+                        "optionLabels": "namespaces:devices_all:deviceName"
+                    }
+                }
+            },
+            "renderDevices": {
+                "label": "__l_renderDevices__",
+                "fields": {
+                    "item": {
+                        "fields": {
+                            "deviceId": {
+                                "type": "select",
+                                "readonly": true,
+                                "datasource": "namespaces",
+                                "field": "optionLabels",
+                                "optionLabels": "namespaces:devices_all:deviceName"
+                            },
+                            "deviceType": {
+                                "readonly": true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
