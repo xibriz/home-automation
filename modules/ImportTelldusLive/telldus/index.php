@@ -9,6 +9,9 @@ Description:
     Needs to run on on a local web-server with the z-way-service is
 ******************************************************************************/
 
+//Tip: Verify that the script function properly with this url:
+//http://localhost/telldus/index.php?URI={%22resource%22:%22devices%22,%22function%22:%22list%22}&params={%22supportedMethods%22:19,%22includeIgnored%22:1}
+
 require_once 'HTTP/OAuth/Consumer.php';
 
 define('PUBLIC_KEY', '');
