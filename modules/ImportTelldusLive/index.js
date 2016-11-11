@@ -30,7 +30,7 @@ ImportTelldusLive.prototype.init = function (config) {
     this.timerD = null; //Device Timer
     this.timerS = null; //Sensor Timer
 
-    this.requestDeviceUpdate();
+    //this.requestDeviceUpdate();
     this.requestSensorUpdate();
 };
 
@@ -43,7 +43,7 @@ ImportTelldusLive.prototype.stop = function () {
     if (this.timerS) {
         clearTimeout(this.timerS);
     }
-
+    
     this.controller.devices.filter(function (xDev) {
         return (xDev.id.indexOf("TL_" + self.id + "_") !== -1);
     }).map(function (yDev) {
@@ -124,10 +124,7 @@ ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
 
             if (vDev) {
                 vDev.set("metrics:level", level);
-            } else {
-                if (self.skipDevice(localId)) {
-                    return;
-                }
+            } else if (!self.skipDevice(localId)) {
 
                 var deviceType = (item.methods === 19) ? "switchMultilevel" : "switchBinary";
                 var probeTitle = (item.methods === 19) ? "Multilevel" : "Binary";
@@ -151,8 +148,7 @@ ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
                     moduleId: this.id
                 });
 
-                self.config.renderDevices.push({deviceId: localId, deviceType: deviceType});
-                self.saveConfig();
+                self.renderDevice({deviceId: localId, deviceType: "sensorMultilevel"});
             }
         });
 
@@ -239,6 +235,22 @@ ImportTelldusLive.prototype.skipDevice = function (id) {
     return skip;
 };
 
+ImportTelldusLive.prototype.renderDevice = function (obj) {
+    var skip = false;
+    
+    this.config.renderDevices.forEach(function (deviceObj) {
+        if (deviceObj.deviceId === obj.deviceId) {
+            skip |= true;
+            return false; // break
+        }
+    });
+    
+    if (!skip) {
+        this.config.renderDevices.push(obj);
+        this.saveConfig();
+    }
+};
+
 ImportTelldusLive.prototype.requestSensorUpdate = function () {
     var self = this;
 
@@ -296,7 +308,7 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
                 } else if (!self.skipDevice(localId)) {
                     var icon = (sensorData.name === "temp") ? "temperature" : "humidity";
                     var scaleTitle = (sensorData.name === "temp") ? "°C" : "%";
-
+                    
                     self.controller.devices.create({
                         deviceId: localId,
                         defaults: {
@@ -316,8 +328,7 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
                         updateTime: item.lastUpdated
                     });
 
-                    self.config.renderDevices.push({deviceId: localId, deviceType: "sensorMultilevel"});
-                    self.saveConfig();
+                    self.renderDevice({deviceId: localId, deviceType: "sensorMultilevel"});
                 }
 
                 subId++;
