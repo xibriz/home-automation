@@ -30,7 +30,7 @@ ImportTelldusLive.prototype.init = function (config) {
     this.timerD = null; //Device Timer
     this.timerS = null; //Sensor Timer
 
-    //this.requestDeviceUpdate();
+    this.requestDeviceUpdate();
     this.requestSensorUpdate();
 };
 
