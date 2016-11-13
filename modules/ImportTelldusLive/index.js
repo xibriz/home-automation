@@ -123,7 +123,9 @@ ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
             }
 
             if (vDev) {
-                vDev.set("metrics:level", level);
+                if (vDev.get("metrics:level") !== level) { //Only change if the level if different (or triggers will go haywire)
+                    vDev.set("metrics:level", level);
+                }
             } else if (!self.skipDevice(localId)) {
 
                 var deviceType = (item.methods === 19) ? "switchMultilevel" : "switchBinary";
