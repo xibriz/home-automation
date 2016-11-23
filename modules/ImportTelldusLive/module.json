@@ -7,7 +7,7 @@
     "icon": "icon.png",
     "moduleName": "ImportTelldusLive",
     "version": "1.0.0",
-    "maturity": "beta",
+    "maturity": "stable",
     "repository": {
         "type": "git",
         "source": "https://github.com/xibriz/home-automation"

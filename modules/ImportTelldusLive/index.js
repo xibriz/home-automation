@@ -123,6 +123,7 @@ ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
             }
 
             if (vDev) {
+                vDev.set("metrics:title", "TL " + item.name); //Update title
                 if (vDev.get("metrics:level") !== level) { //Only change if the level if different (or triggers will go haywire)
                     vDev.set("metrics:level", level);
                 }
@@ -305,8 +306,11 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
                         vDev = self.controller.devices.get(localId);
 
                 if (vDev) {
-                    vDev.set("metrics:level", sensorData.value);
+                    vDev.set("metrics:title", "TL " + item.name + " " + sensorData.name); //Update title
                     vDev.set("updateTime", sensorData.lastUpdated);
+                    if (vDev.get("metrics:level") !== sensorData.value) { //Only change if the level if different (or triggers will go haywire)
+                        vDev.set("metrics:level", sensorData.value);
+                    }
                 } else if (!self.skipDevice(localId)) {
                     var icon = (sensorData.name === "temp") ? "temperature" : "humidity";
                     var scaleTitle = (sensorData.name === "temp") ? "°C" : "%";
