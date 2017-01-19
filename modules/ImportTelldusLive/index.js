@@ -25,6 +25,8 @@ ImportTelldusLive.prototype.init = function (config) {
     this.urlPrefix = this.config.url + "/index.php";
     this.dT = Math.max(this.config.dT, 500); // 500 ms minimal delay between requests
     this.sT = Math.max(this.config.sT, 30000); // 30000 ms minimal delay between requests for sensors
+    this.urlEmonCMSPrefix = this.config.urlEmonCMS;
+    this.apiKeyEmonCMS = this.config.apiKeyEmonCMS;
     this.lastRequestD = 0;
     this.lastRequestS = 0;
     this.timerD = null; //Device Timer
@@ -43,7 +45,7 @@ ImportTelldusLive.prototype.stop = function () {
     if (this.timerS) {
         clearTimeout(this.timerS);
     }
-    
+
     this.controller.devices.filter(function (xDev) {
         return (xDev.id.indexOf("TL_" + self.id + "_") !== -1);
     }).map(function (yDev) {
@@ -118,21 +120,28 @@ ImportTelldusLive.prototype.parseDeviceResponse = function (response) {
                     break;
                 case 16: //ON Dim
                     //Konverting from the scale from 0-255 to 0-99
-                    level = Math.round((parseInt(item.statevalue, 10) / 255) * 99);
+                    level = (item.statevalue === null) ? 0 : Math.round((parseInt(item.statevalue, 10) / 255) * 99);
+                    if (isNaN(level)) {
+                        level = 0;
+                    }
                     break;
             }
 
+            var deviceType = (item.methods === 19) ? "switchMultilevel" : "switchBinary";
+            var probeTitle = (item.methods === 19) ? "Multilevel" : "Binary";
+            var icon = (item.methods === 19) ? "multilevel" : "switch";
+                
             if (vDev) {
                 vDev.set("metrics:title", "TL " + item.name); //Update title
+                //TODO: Device type dont change when altered in Telldus
+//                vDev.set("metrics:probeTitle", probeTitle); //Update 
+//                vDev.set("metrics:icon", icon); //Update 
+//                vDev.set("deviceType", deviceType); //Update 
+                
                 if (vDev.get("metrics:level") !== level) { //Only change if the level if different (or triggers will go haywire)
                     vDev.set("metrics:level", level);
                 }
             } else if (!self.skipDevice(localId)) {
-
-                var deviceType = (item.methods === 19) ? "switchMultilevel" : "switchBinary";
-                var probeTitle = (item.methods === 19) ? "Multilevel" : "Binary";
-                var icon = (item.methods === 19) ? "multilevel" : "switch";
-
                 self.controller.devices.create({
                     deviceId: localId,
                     defaults: {
@@ -225,6 +234,29 @@ ImportTelldusLive.prototype.handleDeviceCommand = function (vDev, command, args)
     });
 };
 
+ImportTelldusLive.prototype.logSensorValue = function (vDev) {
+    var self = this;
+    try {
+        var url = this.urlEmonCMSPrefix+"/input/post.json?time=" + vDev.get("updateTime") + "&node=" + vDev.id + "&json={%22" + vDev.get("metrics:icon") + "%22:%22" + vDev.get("metrics:level") + "%22}&apikey="+this.apiKeyEmonCMS;
+        console.log("Logging sensor value " + url);
+        http.request({
+            url: url,
+            method: "GET",
+            async: true,
+            success: function (response) {
+                console.log("response status "+response.data.success+" message: "+response.data.message);
+            },
+            error: function (response) {
+                console.log("Can not make request: " + response.statusText); // don't add it to notifications, since it will fill all the notifcations on error
+            },
+            complete: function () {
+            }
+        });
+    } catch (e) {
+        //Probably error in one of vDev.get
+    }
+};
+
 ImportTelldusLive.prototype.skipDevice = function (id) {
     var skip = false;
 
@@ -240,14 +272,14 @@ ImportTelldusLive.prototype.skipDevice = function (id) {
 
 ImportTelldusLive.prototype.renderDevice = function (obj) {
     var skip = false;
-    
+
     this.config.renderDevices.forEach(function (deviceObj) {
         if (deviceObj.deviceId === obj.deviceId) {
             skip |= true;
             return false; // break
         }
     });
-    
+
     if (!skip) {
         this.config.renderDevices.push(obj);
         this.saveConfig();
@@ -314,7 +346,7 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
                 } else if (!self.skipDevice(localId)) {
                     var icon = (sensorData.name === "temp") ? "temperature" : "humidity";
                     var scaleTitle = (sensorData.name === "temp") ? "°C" : "%";
-                    
+
                     self.controller.devices.create({
                         deviceId: localId,
                         defaults: {
@@ -336,7 +368,10 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
 
                     self.renderDevice({deviceId: localId, deviceType: "sensorMultilevel"});
                 }
-
+                //Log values to EmonCMS if URL and API Key is provided
+                if (this.urlEmonCMSPrefix.length > 0 && this.apiKeyEmonCMS.length > 0) {
+                    self.logSensorValue(vDev);
+                }
                 subId++;
             });
         });
