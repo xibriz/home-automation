@@ -236,15 +236,19 @@ ImportTelldusLive.prototype.handleDeviceCommand = function (vDev, command, args)
 
 ImportTelldusLive.prototype.logSensorValue = function (vDev) {
     var self = this;
+    //Log values to EmonCMS if URL and API Key is provided
+    if (this.urlEmonCMSPrefix.length === 0 || this.apiKeyEmonCMS.length === 0) {
+        return;
+    }
     try {
-        var url = this.urlEmonCMSPrefix+"/input/post.json?time=" + vDev.get("updateTime") + "&node=" + vDev.id + "&json={%22" + vDev.get("metrics:icon") + "%22:%22" + vDev.get("metrics:level") + "%22}&apikey="+this.apiKeyEmonCMS;
-        console.log("Logging sensor value " + url);
+        var url = this.urlEmonCMSPrefix+"/input/post.json?time=" + vDev.get("updateTime") + "&node=" + vDev.id.slice(0, -1) + "&json={%22" + vDev.get("metrics:icon") + "%22:%22" + vDev.get("metrics:level") + "%22}&apikey="+this.apiKeyEmonCMS;
+        //console.log("Logging sensor value " + url);
         http.request({
             url: url,
             method: "GET",
             async: true,
             success: function (response) {
-                console.log("response status "+response.data.success+" message: "+response.data.message);
+                //console.log("response status "+response.data.success+" message: "+response.data.message);
             },
             error: function (response) {
                 console.log("Can not make request: " + response.statusText); // don't add it to notifications, since it will fill all the notifcations on error
@@ -368,10 +372,7 @@ ImportTelldusLive.prototype.parseSensorResponse = function (response) {
 
                     self.renderDevice({deviceId: localId, deviceType: "sensorMultilevel"});
                 }
-                //Log values to EmonCMS if URL and API Key is provided
-                if (this.urlEmonCMSPrefix.length > 0 && this.apiKeyEmonCMS.length > 0) {
-                    self.logSensorValue(vDev);
-                }
+                self.logSensorValue(vDev);
                 subId++;
             });
         });
